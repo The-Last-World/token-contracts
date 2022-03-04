@@ -50,7 +50,7 @@ contract TheLastWorldVestingVault is Ownable {
         require(token.transferFrom(owner(), address(this), _amount));
 
         Grant memory grant = Grant({
-            startTime: currentTime() + uint256(_vestingDurationInMonths) * 4 weeks,
+            startTime: currentTime() + uint256(_vestingCliffInMonths) * 4 weeks,
             amount: _amount,
             vestingDuration: _vestingDurationInMonths,
             monthsClaimed: 0,
