@@ -2,13 +2,9 @@
 pragma solidity ^0.8.12;
 
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
-import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/access/Ownable.sol";
 
 contract TheLastWorldVestingVault is Ownable {
-    using SafeMath for uint256;
-    using SafeMath for uint16;
-
     struct Grant {
         uint256 startTime;
         uint256 amount;
@@ -43,7 +39,7 @@ contract TheLastWorldVestingVault is Ownable {
         require(_vestingCliffInMonths <= 5*12, "Cliff greater than 5 years");
         require(_vestingDurationInMonths <= 10*12, "Duration greater than 10 years");
         
-        uint256 amountVestedPerMonth = _amount.div(_vestingDurationInMonths);
+        uint256 amountVestedPerMonth = _amount / _vestingDurationInMonths;
         require(amountVestedPerMonth > 0, "amountVestedPerMonth > 0");
 
         // Transfer the grant tokens under the control of the vesting contract
@@ -69,8 +65,8 @@ contract TheLastWorldVestingVault is Ownable {
         require(amountVested > 0, "Vested is 0");
 
         Grant storage tokenGrant = tokenGrants[msg.sender];
-        tokenGrant.monthsClaimed = uint16(tokenGrant.monthsClaimed.add(monthsVested));
-        tokenGrant.totalClaimed = uint256(tokenGrant.totalClaimed.add(amountVested));
+        tokenGrant.monthsClaimed = tokenGrant.monthsClaimed + monthsVested;
+        tokenGrant.totalClaimed = tokenGrant.totalClaimed + amountVested;
         
         require(token.transfer(tokenGrant.recipient, amountVested), "no tokens");
         emit GrantTokensClaimed(tokenGrant.recipient, amountVested);
@@ -100,16 +96,16 @@ contract TheLastWorldVestingVault is Ownable {
         }
 
         // Check cliff was reached
-        uint elapsedMonths = currentTime().sub(tokenGrant.startTime - 1 days).div(4 weeks);
+        uint elapsedMonths = (currentTime() - tokenGrant.startTime) / 4 weeks;
 
         // If over vesting duration, all tokens vested
         if (elapsedMonths >= tokenGrant.vestingDuration) {
-            uint256 remainingGrant = tokenGrant.amount.sub(tokenGrant.totalClaimed);
-            return (tokenGrant.vestingDuration, remainingGrant);
+            uint256 remainingGrant = tokenGrant.amount - tokenGrant.totalClaimed;
+            return (tokenGrant.vestingDuration - tokenGrant.monthsClaimed, remainingGrant);
         } else {
-            uint16 monthsVested = uint16(elapsedMonths.sub(tokenGrant.monthsClaimed));
-            uint256 amountVestedPerMonth = tokenGrant.amount.div(uint256(tokenGrant.vestingDuration));
-            uint256 amountVested = uint256(monthsVested.mul(amountVestedPerMonth));
+            uint16 monthsVested = uint16(elapsedMonths) - tokenGrant.monthsClaimed;
+            uint256 amountVestedPerMonth = tokenGrant.amount / tokenGrant.vestingDuration;
+            uint256 amountVested = uint256(monthsVested) * amountVestedPerMonth;
             return (monthsVested, amountVested);
         }
     }
